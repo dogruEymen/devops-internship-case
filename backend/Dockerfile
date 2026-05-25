@@ -1,11 +1,14 @@
 FROM python:3.12-slim AS base
 
+ARG BUILD_SHA=local
+ENV BUILD_SHA=$BUILD_SHA
+
 WORKDIR /app
 
 RUN adduser --disabled-password --gecos "" appuser
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY app ./app
 
 USER appuser
 

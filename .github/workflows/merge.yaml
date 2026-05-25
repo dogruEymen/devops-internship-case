@@ -46,20 +46,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute Image name
+      - name: Compute Image metadata
         id: image
         shell: bash
         run: |
-          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
+          repository="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          image_name="ghcr.io/${repository}"
+          short_sha="${GITHUB_SHA::7}"
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            version_tag="${version}"
+          else
+            version="$(awk -F'"' '/^appVersion:/ {print $2}' fastapi-chart/Chart.yaml)"
+            if [[ -z "${version}" ]]; then
+              version="$(awk '/^appVersion:/ {print $2}' fastapi-chart/Chart.yaml)"
+            fi
+            version="${version#v}"
+            version_tag="${version}-${short_sha}"
+          fi
+
+          if [[ -z "${version}" ]]; then
+            echo "Could not determine image version." >&2
+            exit 1
+          fi
+
+          version_tag="${version_tag//\//-}"
+
           echo "name=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${version_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker Image
-        run: docker build --build-arg BUILD_SHA=${{ github.sha }} -t ${{ steps.image.outputs.name }}:${{ github.sha }} ./backend
+        run: |
+          docker build \
+            --build-arg BUILD_SHA=${{ github.sha }} \
+            -t ${{ steps.image.outputs.name }}:${{ steps.image.outputs.sha_tag }} \
+            -t ${{ steps.image.outputs.name }}:${{ steps.image.outputs.version_tag }} \
+            ./backend
 
       - name: Scanning Image via Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.version_tag }}
           exit-code: "1"
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -72,4 +101,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push Docker Image
-        run: docker push ${{ steps.image.outputs.name }}:${{ github.sha }}
+        run: |
+          docker push ${{ steps.image.outputs.name }}:${{ steps.image.outputs.sha_tag }}
+          docker push ${{ steps.image.outputs.name }}:${{ steps.image.outputs.version_tag }}

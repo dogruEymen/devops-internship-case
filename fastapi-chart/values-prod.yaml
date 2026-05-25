@@ -2,7 +2,7 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/dogrueymen/devops-internship-case
-  tag: "1.0.0-eb95351"
+  tag: "1.0.0-19c14e5"
   pullPolicy: IfNotPresent
 
 service:

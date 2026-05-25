@@ -1,0 +1,35 @@
+replicaCount: 1
+
+image:
+  repository: fastapi-backend
+  tag: latest
+  pullPolicy: Never
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+containerPort: 8000
+
+livenessProbe:
+  path: /healthz
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+readinessProbe:
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+ingress:
+  enabled: true
+  className: ngrok
+  host: prolonged-napped-managing.ngrok-free.dev
+  paths:
+    - path: /
+      pathType: Prefix
